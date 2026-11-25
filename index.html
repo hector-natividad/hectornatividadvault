@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Northvale">
+<meta name="theme-color" content="#0b2545">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>Northvale Private</title>
+<style>
+:root{--navy:#0b2545;--navy2:#13406e;--gold:#e9d8a6;--bg:#f3f4f7;--card:#fff;--ink:#121826;--mute:#6b7280;--line:#e6e8ee;--up:#0a7d45;--down:#c0392b}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input{font:inherit;font-size:16px}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.up{color:var(--up)}.down{color:var(--down)}
+.screen{display:none;min-height:100%}.screen.on{display:block}
+/* setup + lock */
+.dark{background:linear-gradient(170deg,var(--navy),var(--navy2));color:#fff;min-height:100vh;padding:calc(env(safe-area-inset-top) + 40px) 24px 40px;display:flex;flex-direction:column;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.02em}
+.mono{width:34px;height:34px;border-radius:9px;background:var(--gold);color:var(--navy);display:grid;place-items:center;font:700 20px Georgia,serif}
+.dark h1{font-weight:500;font-size:24px;margin:36px 0 6px;text-align:center}
+.dark p{color:#c9d3e3;text-align:center;margin:0 0 24px;max-width:340px}
+.field{width:100%;max-width:360px;margin-bottom:14px}
+.field label{display:block;font-size:13px;color:#c9d3e3;margin-bottom:6px}
+.field input{width:100%;padding:14px;border-radius:12px;border:1px solid #2c5482;background:#0f3157;color:#fff}
+.cta{width:100%;max-width:360px;padding:15px;border-radius:12px;background:var(--gold);color:var(--navy);font-weight:600;margin-top:8px}
+.cta:disabled{opacity:.6}
+.err{color:#ffb4a8;font-size:14px;min-height:20px;text-align:center;max-width:360px}
+.small{font-size:13px;color:#9fb0c8;text-align:center;max-width:340px}
+.dots{display:flex;gap:16px;margin:20px 0 30px}
+.dots i{width:14px;height:14px;border-radius:50%;border:1.5px solid #fff}
+.dots i.f{background:#fff}
+.dots.shake{animation:sh .35s}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pad{display:grid;grid-template-columns:repeat(3,76px);gap:16px 26px}
+.pad button{width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.1);font-size:28px;font-weight:300;color:#fff}
+.pad button:active{background:rgba(255,255,255,.3)}
+.pad .t{background:none;font-size:15px}
+/* app */
+.top{background:linear-gradient(170deg,var(--navy),var(--navy2));color:#fff;padding:calc(env(safe-area-inset-top) + 14px) 20px 26px}
+.bar{display:flex;justify-content:space-between;align-items:center}
+.icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff}
+.icon svg{width:22px;height:22px}
+.hello{margin:22px 0 4px;color:#c9d3e3;font-size:15px}
+.total{font-size:clamp(36px,11vw,46px);font-weight:600;letter-spacing:-.02em;margin:2px 0}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:5px 10px;border-radius:999px;font-size:14px;font-weight:600;background:rgba(255,255,255,.12)}
+.pill.up{color:#7ee2a8}.pill.down{color:#ffaa9e}
+.asof{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:#c9d3e3}
+.asof button{display:inline-flex;align-items:center;gap:6px;color:#fff;font-weight:600;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12)}
+.asof svg{width:15px;height:15px}
+.spin svg{animation:rot 1s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}
+.chartwrap{margin-top:16px;height:120px;position:relative}
+.chartwrap svg{position:absolute;inset:0;width:100%;height:100%}
+.ranges{display:flex;justify-content:space-between;margin-top:8px}
+.ranges button{color:#c9d3e3;font-size:13px;font-weight:600;padding:6px 10px;border-radius:999px}
+.ranges button.on{background:rgba(255,255,255,.16);color:#fff}
+main{padding:16px 16px calc(env(safe-area-inset-bottom) + 90px);max-width:640px;margin:0 auto}
+h2{font-size:13px;font-weight:600;color:var(--mute);margin:18px 4px 8px;letter-spacing:.01em}
+.card{background:var(--card);border-radius:16px;box-shadow:0 1px 2px rgba(16,24,40,.06);overflow:hidden}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 16px;border-top:1px solid var(--line);width:100%;text-align:left}
+.row:first-child{border-top:0}
+.row:active{background:#f7f8fa}
+.row .l b{display:block;font-weight:600}
+.row .l span{font-size:13px;color:var(--mute)}
+.row .r{text-align:right}
+.row .r b{display:block;font-weight:600}
+.row .r span{font-size:13px}
+.chev{color:#b4bac6;margin-left:4px}
+.alloc{padding:16px}
+.abar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-bottom:14px}
+.leg{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:14px}
+.leg div{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.leg i{width:10px;height:10px;border-radius:3px;flex:none}
+.leg span{flex:1}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.stats div{background:#fff;padding:14px 16px}
+.stats span{display:block;font-size:13px;color:var(--mute)}
+.stats b{font-weight:600}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 0 calc(env(safe-area-inset-bottom) + 6px)}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--mute);min-width:80px;padding:4px}
+.tabs button.on{color:var(--navy)}
+.tabs svg{width:24px;height:24px}
+.sub{background:linear-gradient(170deg,var(--navy),var(--navy2));color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 12px 22px}
+.sub .bar{justify-content:flex-start;gap:4px}
+.sub h3{margin:10px 8px 2px;font-weight:500;font-size:16px;color:#c9d3e3}
+.sub .total{margin-left:8px}
+.sub .pill{margin-left:8px}
+.sheet{position:fixed;inset:0;background:rgba(10,20,35,.45);display:none;align-items:flex-end;z-index:9}
+.sheet.on{display:flex}
+.sheet .in{background:#fff;width:100%;max-width:640px;margin:0 auto;border-radius:20px 20px 0 0;padding:10px 0 calc(env(safe-area-inset-bottom) + 20px);max-height:88vh;overflow:auto;animation:upin .22s ease-out}
+@keyframes upin{from{transform:translateY(40px);opacity:.5}}
+.grab{width:40px;height:5px;border-radius:3px;background:#d5d9e0;margin:0 auto 12px}
+.sh-head{padding:4px 20px 14px}
+.sh-head small{color:var(--mute);font-size:13px}
+.sh-head h4{margin:2px 0 6px;font-size:20px}
+.sh-head .p{font-size:32px;font-weight:600}
+.btnrow{padding:14px 16px 0;display:grid;gap:10px}
+.btn{padding:14px;border-radius:12px;background:var(--bg);font-weight:600;text-align:center}
+.btn.danger{color:var(--down)}
+.btn.primary{background:var(--navy);color:#fff}
+.note{font-size:12px;color:var(--mute);text-align:center;margin:18px 8px 0}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translate(-50%,-80px);background:#121826;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;transition:transform .25s;z-index:20;max-width:90vw}
+.toast.on{transform:translate(-50%,0)}
+.sh-field{padding:0 16px 10px}
+.sh-field input{width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.sh-field label{font-size:13px;color:var(--mute);display:block;margin:0 0 6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen" id="setup"><div class="dark">
+  <div class="brand"><div class="mono">N</div>Northvale Private</div>
+  <h1>Open your accounts</h1>
+  <p>$5,000,000 will be invested at today's live market prices across two accounts.</p>
+  <div class="field"><label for="sName">First name</label><input id="sName" autocomplete="given-name" value="Herbie"></div>
+  <div class="field"><label for="sKey">Finnhub API key</label><input id="sKey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your key"></div>
+  <div class="field"><label for="sPin">Create a 4-digit passcode</label><input id="sPin" inputmode="numeric" maxlength="4" pattern="[0-9]*" type="password"></div>
+  <div class="err" id="sErr"></div>
+  <button class="cta" id="sGo">Fund accounts</button>
+  <p class="small" style="margin-top:18px">Your key and passcode are saved only on this device.</p>
+</div></section>
+
+<!-- LOCK -->
+<section class="screen" id="lock"><div class="dark">
+  <div class="brand"><div class="mono">N</div>Northvale Private</div>
+  <h1 id="lHello">Welcome back</h1>
+  <p>Enter your passcode</p>
+  <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+  <div class="pad" id="pad"></div>
+</div></section>
+
+<!-- HOME -->
+<section class="screen" id="home">
+  <div class="top">
+    <div class="bar">
+      <div class="brand"><div class="mono">N</div>Northvale</div>
+      <button class="icon" id="lockBtn" aria-label="Lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
+    </div>
+    <div class="hello" id="hello"></div>
+    <div style="font-size:14px;color:#c9d3e3">Total balance</div>
+    <div class="total num" id="tTotal">—</div>
+    <span class="pill num" id="tDay"></span>
+    <div class="chartwrap" id="chart"></div>
+    <div class="ranges" id="ranges"></div>
+    <div class="asof"><button id="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button><span id="asof"></span></div>
+  </div>
+  <main id="homeMain"></main>
+</section>
+
+<!-- ACCOUNT -->
+<section class="screen" id="acct">
+  <div class="sub">
+    <div class="bar"><button class="icon" id="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button></div>
+    <h3 id="aName"></h3>
+    <div class="total num" id="aTotal"></div>
+    <span class="pill num" id="aDay"></span>
+  </div>
+  <main id="acctMain"></main>
+</section>
+
+<!-- ACTIVITY -->
+<section class="screen" id="activity">
+  <div class="sub"><h3 style="font-size:24px;color:#fff;font-weight:600;margin-top:20px">Activity</h3></div>
+  <main id="actMain"></main>
+</section>
+
+<!-- PROFILE -->
+<section class="screen" id="profile">
+  <div class="sub"><h3 style="font-size:24px;color:#fff;font-weight:600;margin-top:20px">Profile</h3></div>
+  <main id="profMain"></main>
+</section>
+
+<nav class="tabs" id="tabs" style="display:none">
+  <button data-t="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10l9-6 9 6v10H3z"/><path d="M9 20v-6h6v6"/></svg>Accounts</button>
+  <button data-t="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Activity</button>
+  <button data-t="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Profile</button>
+</nav>
+
+<div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+const KEY='northvale_v1';
+const START=5000000;
+const PLAN=[
+ {id:'brk',name:'Individual Brokerage',mask:'7730',lots:[
+  ['VTI','Vanguard Total Stock Market ETF',700000],
+  ['VOO','Vanguard S&P 500 ETF',600000],
+  ['QQQ','Invesco QQQ Trust',350000],
+  ['VXUS','Vanguard Total International Stock ETF',350000],
+  ['SCHD','Schwab U.S. Dividend Equity ETF',250000],
+  ['SGOV','iShares 0-3 Month Treasury Bond ETF',250000],
+  ['NVDA','NVIDIA Corp',150000],
+  ['MSFT','Microsoft Corp',150000],
+  ['AAPL','Apple Inc',150000],
+  ['BRK.B','Berkshire Hathaway Inc Class B',150000],
+  ['GLD','SPDR Gold Shares',150000],
+  ['GOOGL','Alphabet Inc Class A',125000],
+  ['AMZN','Amazon.com Inc',125000]]},
+ {id:'ira',name:'Rollover IRA',mask:'4821',lots:[
+  ['VTI','Vanguard Total Stock Market ETF',500000],
+  ['BND','Vanguard Total Bond Market ETF',400000],
+  ['VXUS','Vanguard Total International Stock ETF',250000],
+  ['SCHD','Schwab U.S. Dividend Equity ETF',200000],
+  ['VNQ','Vanguard Real Estate ETF',150000]]}
+];
+const CLASS={VTI:'U.S. stocks',VOO:'U.S. stocks',QQQ:'U.S. stocks',SCHD:'U.S. stocks',NVDA:'U.S. stocks',MSFT:'U.S. stocks',AAPL:'U.S. stocks','BRK.B':'U.S. stocks',GOOGL:'U.S. stocks',AMZN:'U.S. stocks',VXUS:'International',BND:'Bonds',SGOV:'Treasury bills',GLD:'Gold',VNQ:'Real estate',CASH:'Cash'};
+const CCOL={'U.S. stocks':'#13406e','International':'#3a86c8','Bonds':'#8fb8de','Treasury bills':'#b9c7d6','Gold':'#d4a72c','Real estate':'#2a9d8f','Cash':'#9aa3b2'};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd=(n,d=2)=>n.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=(n,d=2)=>(n>=0?'+':'−')+usd(Math.abs(n),d);
+const pct=n=>(n>=0?'+':'−')+Math.abs(n).toFixed(2)+'%';
+const shr=n=>n.toLocaleString('en-US',{maximumFractionDigits:4});
+const cls=n=>n>=0?'up':'down';
+const tri=n=>n>=0?'▲':'▼';
+
+let S=load();
+let range='1M', unlocked=false, busy=false, hiddenAt=0, curAcct=null;
+
+function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save on this device')}}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2600)}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));$('tabs').style.display=['home','activity','profile'].includes(id)?'flex':'none';document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));window.scrollTo(0,0)}
+
+async function quote(sym,key){
+  const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+encodeURIComponent(key));
+  if(r.status===401||r.status===403)throw new Error('key');
+  if(r.status===429)throw new Error('rate');
+  if(!r.ok)throw new Error('http');
+  const j=await r.json();
+  if(!j||!j.c)return null;
+  return {c:j.c,pc:j.pc||j.c,h:j.h,l:j.l,o:j.o,t:(j.t||0)*1000};
+}
+const symbols=()=>[...new Set(PLAN.flatMap(a=>a.lots.map(l=>l[0])))];
+async function fetchAll(key){
+  const out={},syms=symbols();
+  const res=await Promise.allSettled(syms.map(s=>quote(s,key)));
+  res.forEach((r,i)=>{if(r.status==='fulfilled'&&r.value)out[syms[i]]=r.value});
+  const rej=res.find(r=>r.status==='rejected');
+  if(!Object.keys(out).length&&rej)throw rej.reason;
+  return out;
+}
+
+/* ---------- valuation ---------- */
+function acctVal(a){
+  let v=a.cash,day=0,cost=a.cash;
+  a.h.forEach(h=>{const q=S.q[h.s];const p=q?q.c:h.cost/h.n;v+=p*h.n;cost+=h.cost;if(q)day+=(q.c-q.pc)*h.n});
+  return {v,day,cost,gain:v-cost};
+}
+function totals(){let v=0,day=0,cost=0;S.a.forEach(a=>{const x=acctVal(a);v+=x.v;day+=x.day;cost+=x.cost});return {v,day,cost,gain:v-cost}}
+function lastQuoteTime(){return Math.max(0,...Object.values(S.q).map(q=>q.t||0))}
+
+/* ---------- setup ---------- */
+$('sGo').onclick=async()=>{
+  const name=$('sName').value.trim()||'there',key=$('sKey').value.trim(),pin=$('sPin').value.trim();
+  if(!key){$('sErr').textContent='Paste your Finnhub key.';return}
+  if(!/^\d{4}$/.test(pin)){$('sErr').textContent='Passcode must be 4 digits.';return}
+  $('sErr').textContent='';$('sGo').disabled=true;$('sGo').textContent='Buying at market prices…';
+  try{
+    const q=await fetchAll(key);
+    const missing=symbols().filter(s=>!q[s]);
+    if(missing.length>3){throw new Error('missing:'+missing.join(', '))}
+    const now=Date.now(),acts=[];
+    const a=PLAN.map(p=>{
+      let cash=0;const h=[];
+      p.lots.forEach(([s,n,amt])=>{if(!q[s]){cash+=amt;return}const px=q[s].c,sh=Math.floor(amt/px);h.push({s,name:n,n:sh,cost:sh*px});cash+=amt-sh*px;acts.push({t:now,acct:p.name,txt:'Bought '+sh.toLocaleString()+' '+s+' @ '+usd(px),amt:-(sh*px)})});
+      const dep=p.lots.reduce((x,l)=>x+l[2],0);
+      acts.unshift({t:now-60000,acct:p.name,txt:'Deposit',amt:dep});
+      return {id:p.id,name:p.name,mask:p.mask,cash,h};
+    });
+    S={name,key,pin,a,q,hist:[{t:now,v:START}],acts,opened:now,last:now};
+    save();unlocked=true;go();toast(missing.length?'Funded. No price for '+missing.join(', ')+', held as cash':'Accounts funded at live prices');
+  }catch(e){
+    const m=String(e.message||e);
+    $('sErr').textContent=m==='key'?'That key was rejected. Check it and try again.':m==='rate'?'Too many requests. Wait a minute and retry.':m.startsWith('missing')?'No price for '+m.slice(8)+'. Try again during or after market hours.':'Could not reach Finnhub. Check your connection.';
+  }finally{$('sGo').disabled=false;$('sGo').textContent='Fund accounts'}
+};
+
+/* ---------- lock ---------- */
+let entry='';
+function buildPad(){
+  const keys=['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  $('pad').innerHTML=keys.map(k=>k===''?'<span></span>':`<button class="${k==='⌫'?'t':''}" data-k="${k}">${k==='⌫'?'Delete':k}</button>`).join('');
+  $('pad').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;
+    if(k==='⌫')entry=entry.slice(0,-1);else if(entry.length<4)entry+=k;dots();
+    if(entry.length===4){if(entry===S.pin){entry='';dots();unlocked=true;go()}else{const d=$('dots');d.classList.add('shake');setTimeout(()=>{d.classList.remove('shake');entry='';dots()},350)}}};
+}
+function dots(){[...$('dots').children].forEach((d,i)=>d.classList.toggle('f',i<entry.length))}
+function lock(){unlocked=false;entry='';dots();$('lHello').textContent='Welcome back, '+S.name;closeSheet();show('lock')}
+$('lockBtn').onclick=lock;
+
+/* ---------- refresh ---------- */
+async function refresh(silent){
+  if(busy)return;busy=true;$('refresh').classList.add('spin');
+  try{
+    const q=await fetchAll(S.key);Object.assign(S.q,q);S.last=Date.now();
+    const v=totals().v,h=S.hist,lastH=h[h.length-1];
+    if(lastH&&S.last-lastH.t<10*60000&&h.length>1)lastH.v=v,lastH.t=S.last;else h.push({t:S.last,v});
+    if(h.length>3000)h.splice(1,h.length-3000);
+    save();render();if(!silent)toast('Balances updated');
+  }catch(e){const m=String(e.message);toast(m==='key'?'Your Finnhub key was rejected — update it in Profile':m==='rate'?'Too many refreshes. Try again in a minute':'Couldn’t update. Showing last known prices')}
+  finally{busy=false;$('refresh').classList.remove('spin')}
+}
+$('refresh').onclick=()=>refresh(false);
+
+/* ---------- render ---------- */
+function greet(){const h=new Date().getHours();return (h<12?'Good morning':h<18?'Good afternoon':'Good evening')+', '+S.name}
+function mkt(){const et=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));const d=et.getDay(),m=et.getHours()*60+et.getMinutes();return d>0&&d<6&&m>=570&&m<960?'Market open':'Market closed'}
+function fmtTime(t){if(!t)return'';const d=new Date(t),today=new Date().toDateString()===d.toDateString();return (today?'Today':d.toLocaleDateString('en-US',{month:'short',day:'numeric'}))+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+function pillHTML(day,base){const p=base?day/base*100:0;return `${tri(day)} ${sgn(day)} (${pct(p).slice(1)}) today`}
+
+function render(){
+  const T=totals();
+  $('hello').textContent=greet();
+  $('tTotal').textContent=usd(T.v);
+  const tp=$('tDay');tp.className='pill num '+cls(T.day);tp.textContent=pillHTML(T.day,T.v-T.day);
+  $('asof').textContent=mkt()+' · Prices as of '+fmtTime(lastQuoteTime()||S.last);
+  $('ranges').innerHTML=['1W','1M','3M','1Y','ALL'].map(r=>`<button class="${r===range?'on':''}" data-r="${r}">${r}</button>`).join('');
+  drawChart();
+  // accounts
+  const acc=S.a.map((a,i)=>{const x=acctVal(a);return `<button class="row" data-a="${i}"><div class="l"><b>${esc(a.name)}</b><span>••••${esc(a.mask)}</span></div><div class="r"><b class="num">${usd(x.v)}</b><span class="num ${cls(x.day)}">${sgn(x.day)} today</span></div><span class="chev">›</span></button>`}).join('');
+  // allocation
+  const by={};S.a.forEach(a=>{by.Cash=(by.Cash||0)+a.cash;a.h.forEach(h=>{const q=S.q[h.s];const c=CLASS[h.s];by[c]=(by[c]||0)+(q?q.c:h.cost/h.n)*h.n})});
+  const parts=Object.entries(by).filter(e=>e[1]/T.v>=.0005).sort((a,b)=>b[1]-a[1]);
+  const bar=parts.map(([c,v])=>`<span style="width:${v/T.v*100}%;background:${CCOL[c]}"></span>`).join('');
+  const leg=parts.map(([c,v])=>`<div><i style="background:${CCOL[c]}"></i><span>${c}</span><b class="num">${(v/T.v*100).toFixed(1)}%</b></div>`).join('');
+  // movers
+  const mv=[...new Set(S.a.flatMap(a=>a.h.map(h=>h.s)))].map(s=>{const q=S.q[s];return q?{s,p:(q.c-q.pc)/q.pc*100,c:q.c}:null}).filter(Boolean).sort((a,b)=>Math.abs(b.p)-Math.abs(a.p)).slice(0,4);
+  const mvh=mv.map(m=>`<button class="row" data-s="${esc(m.s)}"><div class="l"><b>${esc(m.s)}</b><span>${esc(nameOf(m.s))}</span></div><div class="r"><b class="num">${usd(m.c)}</b><span class="num ${cls(m.p)}">${pct(m.p)}</span></div></button>`).join('');
+  $('homeMain').innerHTML=`<h2>Accounts</h2><div class="card">${acc}</div>
+  <h2>Since you opened</h2><div class="card stats"><div><span>Invested</span><b class="num">${usd(T.cost,0)}</b></div><div><span>Total gain/loss</span><b class="num ${cls(T.gain)}">${sgn(T.gain)}</b></div><div><span>Return</span><b class="num ${cls(T.gain)}">${pct(T.gain/T.cost*100)}</b></div><div><span>Opened</span><b>${new Date(S.opened).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</b></div></div>
+  <h2>Asset allocation</h2><div class="card alloc"><div class="abar">${bar}</div><div class="leg">${leg}</div></div>
+  <h2>Today's biggest movers</h2><div class="card">${mvh}</div>
+  <p class="note">Northvale Private is a personal simulation. Prices from Finnhub; may be delayed.</p>`;
+  if(curAcct!==null)renderAcct(curAcct);
+  renderAct();renderProf();
+}
+function nameOf(s){for(const a of S.a)for(const h of a.h)if(h.s===s)return h.name;return s}
+
+function drawChart(){
+  const el=$('chart'),W=el.clientWidth||320,H=el.clientHeight||120;
+  const span={'1W':7,'1M':30,'3M':91,'1Y':365,'ALL':1e5}[range]*864e5;
+  let pts=S.hist.filter(p=>p.t>=Date.now()-span);
+  if(pts.length<2)pts=S.hist.slice(-2);
+  if(pts.length<2){el.innerHTML=`<svg viewBox="0 0 ${W} ${H}"><line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#7fa7d4" stroke-width="2" stroke-dasharray="4 5"/><text x="${W/2}" y="${H/2-12}" fill="#c9d3e3" font-size="12" text-anchor="middle">Your history starts today</text></svg>`;return}
+  const t0=pts[0].t,t1=pts[pts.length-1].t||t0+1,vs=pts.map(p=>p.v),mn=Math.min(...vs),mx=Math.max(...vs),pad=(mx-mn)*.15||mx*.002;
+  const X=t=>(t-t0)/(t1-t0||1)*(W-8)+4,Y=v=>H-6-(v-(mn-pad))/((mx+pad)-(mn-pad))*(H-12);
+  const d=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
+  const upc=vs[vs.length-1]>=vs[0]?'#7ee2a8':'#ffaa9e';
+  const last=pts[pts.length-1];
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${upc}" stop-opacity=".35"/><stop offset="1" stop-color="${upc}" stop-opacity="0"/></linearGradient></defs><line x1="0" x2="${W}" y1="${Y(vs[0])}" y2="${Y(vs[0])}" stroke="#ffffff" stroke-opacity=".25" stroke-dasharray="3 4"/><path d="${d} L${X(last.t)} ${H} L${X(t0)} ${H}Z" fill="url(#g)"/><path d="${d}" fill="none" stroke="${upc}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="${X(last.t)}" cy="${Y(last.v)}" r="4" fill="${upc}"/></svg>`;
+}
+const ro=new ResizeObserver(()=>{if(S&&unlocked)drawChart()});ro.observe($('chart'));
+$('ranges').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;render()};
+
+function renderAcct(i){
+  const a=S.a[i],x=acctVal(a);
+  $('aName').textContent=a.name+' ••••'+a.mask;
+  $('aTotal').textContent=usd(x.v);
+  const p=$('aDay');p.className='pill num '+cls(x.day);p.textContent=pillHTML(x.day,x.v-x.day);
+  const rows=a.h.map(h=>{const q=S.q[h.s],px=q?q.c:h.cost/h.n,val=px*h.n,dp=q?(q.c-q.pc)/q.pc*100:0;return {h,px,val,dp}}).sort((p,q)=>q.val-p.val)
+   .map(r=>`<button class="row" data-s="${esc(r.h.s)}"><div class="l"><b>${esc(r.h.s)}</b><span>${shr(r.h.n)} shares · ${usd(r.px)}</span></div><div class="r"><b class="num">${usd(r.val)}</b><span class="num ${cls(r.dp)}">${pct(r.dp)}</span></div></button>`).join('');
+  $('acctMain').innerHTML=`<div class="card stats"><div><span>Market value</span><b class="num">${usd(x.v-a.cash)}</b></div><div><span>Cash &amp; sweep</span><b class="num">${usd(a.cash)}</b></div><div><span>Cost basis</span><b class="num">${usd(x.cost)}</b></div><div><span>Total gain/loss</span><b class="num ${cls(x.gain)}">${sgn(x.gain)}</b></div></div>
+  <h2>Holdings</h2><div class="card">${rows}<div class="row"><div class="l"><b>Cash</b><span>Bank sweep · 0.01% APY</span></div><div class="r"><b class="num">${usd(a.cash)}</b></div></div></div>
+  <p class="note">${a.name==='Rollover IRA'?'Tax-deferred account. Withdrawals before age 59½ may be subject to penalty.':'Taxable account.'}</p>`;
+}
+
+function holdingSheet(sym){
+  const q=S.q[sym];let n=0,cost=0;S.a.forEach(a=>a.h.forEach(h=>{if(h.s===sym){n+=h.n;cost+=h.cost}}));
+  const px=q?q.c:cost/n,val=px*n,day=q?(q.c-q.pc)*n:0,dp=q?(q.c-q.pc)/q.pc*100:0,T=totals().v;
+  const st=[['Shares',shr(n)],['Avg cost',usd(cost/n)],['Market value',usd(val)],['% of portfolio',(val/T*100).toFixed(2)+'%'],['Day change',sgn(day),cls(day)],['Total gain/loss',sgn(val-cost),cls(val-cost)],['Open',q?usd(q.o):'—'],['Prev close',q?usd(q.pc):'—'],['Day high',q?usd(q.h):'—'],['Day low',q?usd(q.l):'—']];
+  openSheet(`<div class="sh-head"><small>${esc(CLASS[sym]||'')}</small><h4>${esc(sym)} · ${esc(nameOf(sym))}</h4><div class="p num">${usd(px)}</div><div class="num ${cls(dp)}" style="font-weight:600">${tri(dp)} ${sgn(q?q.c-q.pc:0)} (${pct(dp).slice(1)}) today</div></div>
+  <div class="stats">${st.map(([k,v,c])=>`<div><span>${k}</span><b class="num ${c||''}">${v}</b></div>`).join('')}</div>
+  <div class="btnrow"><button class="btn" data-close>Done</button></div>`);
+}
+
+function renderAct(){
+  const acts=[...S.acts].sort((a,b)=>b.t-a.t);
+  $('actMain').innerHTML=`<h2>${new Date(S.opened).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</h2><div class="card">`+acts.map(x=>`<div class="row"><div class="l"><b>${esc(x.txt)}</b><span>${esc(x.acct)}</span></div><div class="r"><b class="num ${x.amt>0?'up':''}">${x.amt>0?'+':'−'}${usd(Math.abs(x.amt))}</b></div></div>`).join('')+'</div>';
+}
+function renderProf(){
+  $('profMain').innerHTML=`<div class="card"><div class="row"><div class="l"><b>${esc(S.name)}</b><span>Client since ${new Date(S.opened).getFullYear()}</span></div></div>
+  <button class="row" id="pKey"><div class="l"><b>Market data key</b><span>Finnhub · ends in ${esc(S.key.slice(-4))}</span></div><span class="chev">›</span></button>
+  <button class="row" id="pPin"><div class="l"><b>Change passcode</b></div><span class="chev">›</span></button>
+  <button class="row" id="pBack"><div class="l"><b>Back up portfolio</b><span>Copy your data to save it somewhere safe</span></div><span class="chev">›</span></button>
+  <button class="row" id="pRestore"><div class="l"><b>Restore from backup</b></div><span class="chev">›</span></button></div>
+  <h2>Danger zone</h2><div class="card"><button class="row" id="pReset"><div class="l"><b class="down">Close accounts and start over</b><span>Re-invests $5,000,000 at current prices</span></div></button></div>
+  <p class="note">Northvale Private · simulation only · data stays on this device</p>`;
+  $('pKey').onclick=()=>formSheet('Market data key','Finnhub API key','text',v=>{S.key=v;save();renderProf();toast('Key updated');refresh(true)});
+  $('pPin').onclick=()=>formSheet('Change passcode','New 4-digit passcode','pin',v=>{if(!/^\d{4}$/.test(v))return 'Must be 4 digits';S.pin=v;save();toast('Passcode changed')});
+  $('pBack').onclick=()=>{const data=JSON.stringify({...S,key:undefined,pin:undefined});openSheet(`<div class="sh-head"><h4>Back up portfolio</h4><small>Copy this text and keep it in Notes. Your key and passcode are not included.</small></div><div class="sh-field"><input id="bk" readonly></div><div class="btnrow"><button class="btn primary" id="cp">Copy</button><button class="btn" data-close>Done</button></div>`);$('bk').value=data;$('cp').onclick=async()=>{try{await navigator.clipboard.writeText(data);toast('Copied')}catch(e){$('bk').select();toast('Select and copy the text')}}};
+  $('pRestore').onclick=()=>formSheet('Restore from backup','Paste backup text','text',v=>{try{const o=JSON.parse(v);if(!o.a||!o.hist)throw 0;S={...o,key:S.key,pin:S.pin,name:S.name};save();render();toast('Portfolio restored')}catch(e){return 'That backup text is not valid'}});
+  $('pReset').onclick=()=>formSheet('Start over?','Type RESET to confirm','text',v=>{if(v!=='RESET')return 'Type RESET in capitals';const k=S.key,n=S.name;localStorage.removeItem(KEY);S=null;$('sName').value=n;$('sKey').value=k;closeSheet();show('setup')});
+}
+
+/* ---------- sheets ---------- */
+function openSheet(h){$('sheetIn').innerHTML='<div class="grab"></div>'+h;$('sheet').classList.add('on')}
+function closeSheet(){$('sheet').classList.remove('on')}
+$('sheet').onclick=e=>{if(e.target.id==='sheet'||e.target.closest('[data-close]'))closeSheet()};
+function formSheet(title,label,type,fn){
+  openSheet(`<div class="sh-head"><h4>${esc(title)}</h4></div><div class="sh-field"><label for="fv">${esc(label)}</label><input id="fv" ${type==='pin'?'inputmode="numeric" maxlength="4" type="password"':'autocapitalize="off" spellcheck="false"'}><div class="down" id="fe" style="font-size:13px;min-height:18px;margin-top:6px"></div></div><div class="btnrow"><button class="btn primary" id="fok">Save</button><button class="btn" data-close>Cancel</button></div>`);
+  $('fok').onclick=()=>{const v=$('fv').value.trim();const r=fn(v);if(typeof r==='string')$('fe').textContent=r;else if(S)closeSheet()};
+}
+
+/* ---------- navigation ---------- */
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-a]');if(a){curAcct=+a.dataset.a;renderAcct(curAcct);show('acct');return}
+  const s=e.target.closest('[data-s]');if(s){holdingSheet(s.dataset.s);return}
+  const t=e.target.closest('.tabs button');if(t){curAcct=null;show(t.dataset.t)}
+});
+$('back').onclick=()=>{curAcct=null;show('home')};
+
+document.addEventListener('visibilitychange',()=>{
+  if(!S)return;
+  if(document.hidden){hiddenAt=Date.now();return}
+  if(unlocked&&hiddenAt&&Date.now()-hiddenAt>5*60000)lock();
+  else if(unlocked&&Date.now()-S.last>2*60000)refresh(true);
+});
+
+function go(){render();show('home');if(Date.now()-S.last>2*60000)refresh(true)}
+buildPad();
+if(!S)show('setup');else lock();
+}
+</script>
+</body>
+</html>
