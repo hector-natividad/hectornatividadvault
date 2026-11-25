@@ -215,7 +215,7 @@ const PLAN=[
   ['VNQ','Vanguard Real Estate ETF',150000]]}
 ];
 const CLASS={VTI:'U.S. stocks',VOO:'U.S. stocks',QQQ:'U.S. stocks',SCHD:'U.S. stocks',NVDA:'U.S. stocks',MSFT:'U.S. stocks',AAPL:'U.S. stocks','BRK.B':'U.S. stocks',GOOGL:'U.S. stocks',AMZN:'U.S. stocks',VXUS:'International',BND:'Bonds',SGOV:'Treasury bills',GLD:'Gold',VNQ:'Real estate',CASH:'Cash'};
-const CCOL={'U.S. stocks':'#13406e','International':'#3a86c8','Bonds':'#8fb8de','Treasury bills':'#b9c7d6','Gold':'#d4a72c','Real estate':'#2a9d8f','Cash':'#9aa3b2'};
+const CCOL={'Other':'#5b6b82','U.S. stocks':'#13406e','International':'#3a86c8','Bonds':'#8fb8de','Treasury bills':'#b9c7d6','Gold':'#d4a72c','Real estate':'#2a9d8f','Cash':'#9aa3b2'};
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -243,9 +243,10 @@ async function quote(sym,key){
   if(!j||!j.c)return null;
   return {c:j.c,pc:j.pc||j.c,h:j.h,l:j.l,o:j.o,t:(j.t||0)*1000};
 }
-const symbols=()=>[...new Set(PLAN.flatMap(a=>a.lots.map(l=>l[0])))];
-async function fetchAll(key){
-  const out={},syms=symbols();
+const planSyms=()=>[...new Set(PLAN.flatMap(a=>a.lots.map(l=>l[0])))];
+const symbols=()=>S&&S.a?[...new Set(S.a.flatMap(a=>a.h.map(h=>h.s)))]:planSyms();
+async function fetchAll(key,list){
+  const out={},syms=list||symbols();
   const res=await Promise.allSettled(syms.map(s=>quote(s,key)));
   res.forEach((r,i)=>{if(r.status==='fulfilled'&&r.value)out[syms[i]]=r.value});
   const rej=res.find(r=>r.status==='rejected');
@@ -269,8 +270,8 @@ $('sGo').onclick=async()=>{
   if(!/^\d{4}$/.test(pin)){$('sErr').textContent='Passcode must be 4 digits.';return}
   $('sErr').textContent='';$('sGo').disabled=true;$('sGo').textContent='Buying at market prices…';
   try{
-    const q=await fetchAll(key);
-    const missing=symbols().filter(s=>!q[s]);
+    const q=await fetchAll(key,planSyms());
+    const missing=planSyms().filter(s=>!q[s]);
     if(missing.length>3){throw new Error('missing:'+missing.join(', '))}
     const now=Date.now(),acts=[];
     const a=PLAN.map(p=>{
@@ -306,6 +307,7 @@ async function refresh(silent){
   if(busy)return;busy=true;$('refresh').classList.add('spin');
   try{
     const q=await fetchAll(S.key);Object.assign(S.q,q);S.last=Date.now();
+    await manager();
     const v=totals().v,h=S.hist,lastH=h[h.length-1];
     if(lastH&&S.last-lastH.t<10*60000&&h.length>1)lastH.v=v,lastH.t=S.last;else h.push({t:S.last,v});
     if(h.length>3000)h.splice(1,h.length-3000);
@@ -314,6 +316,35 @@ async function refresh(silent){
   finally{busy=false;$('refresh').classList.remove('spin')}
 }
 $('refresh').onclick=()=>refresh(false);
+
+/* ---------- trading ---------- */
+function exec(acctId,side,sym,opt,by){
+  const a=S.a.find(x=>x.id===acctId);if(!a)return null;const q=S.q[sym];if(!q)return null;const px=q.c;
+  let h=a.h.find(x=>x.s===sym);
+  if(side==='buy'){
+    const want=Math.min(opt.usd||0,a.cash),n=Math.floor(want/px);if(n<1)return null;
+    if(!h){h={s:sym,name:opt.name||sym,n:0,cost:0,cls:opt.cls||CLASS[sym]||'Other'};a.h.push(h)}
+    h.n+=n;h.cost+=n*px;a.cash-=n*px;
+    S.acts.push({t:Date.now(),acct:a.name,txt:'Bought '+n.toLocaleString()+' '+sym+' @ '+usd(px),amt:-(n*px),by});return n;
+  }
+  if(!h)return null;
+  let n=opt.pct!=null?Math.floor(h.n*Math.min(opt.pct,100)/100):opt.usd!=null?Math.min(h.n,Math.ceil(opt.usd/px)):h.n;
+  if(n<1)return null;
+  const avg=h.cost/h.n;h.n-=n;h.cost-=avg*n;a.cash+=n*px;
+  if(h.n<=0)a.h=a.h.filter(x=>x!==h);
+  S.acts.push({t:Date.now(),acct:a.name,txt:'Sold '+n.toLocaleString()+' '+sym+' @ '+usd(px),amt:n*px,by});return n;
+}
+async function manager(){
+  let m;try{const r=await fetch('manager.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)return;m=await r.json()}catch(e){return}
+  S.done=S.done||[];S.notes=m.notes||[];
+  const todo=(m.orders||[]).filter(o=>o&&o.id&&!S.done.includes(o.id)&&(!o.after||Date.parse(o.after)<=Date.now()));
+  if(!todo.length)return;
+  const need=[...new Set(todo.map(o=>o.sym))].filter(s=>!S.q[s]);
+  if(need.length)Object.assign(S.q,await fetchAll(S.key,need));
+  todo.sort((a,b)=>(a.side==='sell'?0:1)-(b.side==='sell'?0:1));
+  let n=0;todo.forEach(o=>{if(!S.q[o.sym])return;exec(o.acct,o.side,o.sym,o,'manager');S.done.push(o.id);n++});
+  if(n)setTimeout(()=>toast('Your manager made '+n+' trade'+(n>1?'s':'')),900);
+}
 
 /* ---------- render ---------- */
 function greet(){const h=new Date().getHours();return (h<12?'Good morning':h<18?'Good afternoon':'Good evening')+', '+S.name}
@@ -332,21 +363,25 @@ function render(){
   // accounts
   const acc=S.a.map((a,i)=>{const x=acctVal(a);return `<button class="row" data-a="${i}"><div class="l"><b>${esc(a.name)}</b><span>••••${esc(a.mask)}</span></div><div class="r"><b class="num">${usd(x.v)}</b><span class="num ${cls(x.day)}">${sgn(x.day)} today</span></div><span class="chev">›</span></button>`}).join('');
   // allocation
-  const by={};S.a.forEach(a=>{by.Cash=(by.Cash||0)+a.cash;a.h.forEach(h=>{const q=S.q[h.s];const c=CLASS[h.s];by[c]=(by[c]||0)+(q?q.c:h.cost/h.n)*h.n})});
+  const by={};S.a.forEach(a=>{by.Cash=(by.Cash||0)+a.cash;a.h.forEach(h=>{const q=S.q[h.s];const c=CLASS[h.s]||h.cls||'Other';by[c]=(by[c]||0)+(q?q.c:h.cost/h.n)*h.n})});
   const parts=Object.entries(by).filter(e=>e[1]/T.v>=.0005).sort((a,b)=>b[1]-a[1]);
   const bar=parts.map(([c,v])=>`<span style="width:${v/T.v*100}%;background:${CCOL[c]}"></span>`).join('');
   const leg=parts.map(([c,v])=>`<div><i style="background:${CCOL[c]}"></i><span>${c}</span><b class="num">${(v/T.v*100).toFixed(1)}%</b></div>`).join('');
   // movers
   const mv=[...new Set(S.a.flatMap(a=>a.h.map(h=>h.s)))].map(s=>{const q=S.q[s];return q?{s,p:(q.c-q.pc)/q.pc*100,c:q.c}:null}).filter(Boolean).sort((a,b)=>Math.abs(b.p)-Math.abs(a.p)).slice(0,4);
   const mvh=mv.map(m=>`<button class="row" data-s="${esc(m.s)}"><div class="l"><b>${esc(m.s)}</b><span>${esc(nameOf(m.s))}</span></div><div class="r"><b class="num">${usd(m.c)}</b><span class="num ${cls(m.p)}">${pct(m.p)}</span></div></button>`).join('');
-  $('homeMain').innerHTML=`<h2>Accounts</h2><div class="card">${acc}</div>
+  const nt=(S.notes||[])[0];
+  const noteH=nt?`<h2>From your portfolio manager</h2><button class="card row" id="noteBtn" style="display:block"><small style="color:var(--mute);font-size:13px">${esc(nt.date||'')}</small><b style="display:block;margin:2px 0 4px">${esc(nt.title||'')}</b><span style="font-size:14px;color:#3b4252;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(nt.body||'')}</span></button>`:'';
+  $('homeMain').innerHTML=noteH+`<h2>Accounts</h2><div class="card">${acc}</div>
   <h2>Since you opened</h2><div class="card stats"><div><span>Invested</span><b class="num">${usd(T.cost,0)}</b></div><div><span>Total gain/loss</span><b class="num ${cls(T.gain)}">${sgn(T.gain)}</b></div><div><span>Return</span><b class="num ${cls(T.gain)}">${pct(T.gain/T.cost*100)}</b></div><div><span>Opened</span><b>${new Date(S.opened).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</b></div></div>
   <h2>Asset allocation</h2><div class="card alloc"><div class="abar">${bar}</div><div class="leg">${leg}</div></div>
   <h2>Today's biggest movers</h2><div class="card">${mvh}</div>
   <p class="note">Northvale Private is a personal simulation. Prices from Finnhub; may be delayed.</p>`;
+  if($('noteBtn'))$('noteBtn').onclick=notesSheet;
   if(curAcct!==null)renderAcct(curAcct);
   renderAct();renderProf();
 }
+function clsOf(s){for(const a of S.a)for(const h of a.h)if(h.s===s)return h.cls||'Other';return ''}
 function nameOf(s){for(const a of S.a)for(const h of a.h)if(h.s===s)return h.name;return s}
 
 function drawChart(){
@@ -373,6 +408,7 @@ function renderAcct(i){
   const rows=a.h.map(h=>{const q=S.q[h.s],px=q?q.c:h.cost/h.n,val=px*h.n,dp=q?(q.c-q.pc)/q.pc*100:0;return {h,px,val,dp}}).sort((p,q)=>q.val-p.val)
    .map(r=>`<button class="row" data-s="${esc(r.h.s)}"><div class="l"><b>${esc(r.h.s)}</b><span>${shr(r.h.n)} shares · ${usd(r.px)}</span></div><div class="r"><b class="num">${usd(r.val)}</b><span class="num ${cls(r.dp)}">${pct(r.dp)}</span></div></button>`).join('');
   $('acctMain').innerHTML=`<div class="card stats"><div><span>Market value</span><b class="num">${usd(x.v-a.cash)}</b></div><div><span>Cash &amp; sweep</span><b class="num">${usd(a.cash)}</b></div><div><span>Cost basis</span><b class="num">${usd(x.cost)}</b></div><div><span>Total gain/loss</span><b class="num ${cls(x.gain)}">${sgn(x.gain)}</b></div></div>
+  <div class="btnrow" style="padding:14px 0 0"><button class="btn primary" data-trade="buy" data-acct="${a.id}">Buy a new investment</button></div>
   <h2>Holdings</h2><div class="card">${rows}<div class="row"><div class="l"><b>Cash</b><span>Bank sweep · 0.01% APY</span></div><div class="r"><b class="num">${usd(a.cash)}</b></div></div></div>
   <p class="note">${a.name==='Rollover IRA'?'Tax-deferred account. Withdrawals before age 59½ may be subject to penalty.':'Taxable account.'}</p>`;
 }
@@ -381,24 +417,51 @@ function holdingSheet(sym){
   const q=S.q[sym];let n=0,cost=0;S.a.forEach(a=>a.h.forEach(h=>{if(h.s===sym){n+=h.n;cost+=h.cost}}));
   const px=q?q.c:cost/n,val=px*n,day=q?(q.c-q.pc)*n:0,dp=q?(q.c-q.pc)/q.pc*100:0,T=totals().v;
   const st=[['Shares',shr(n)],['Avg cost',usd(cost/n)],['Market value',usd(val)],['% of portfolio',(val/T*100).toFixed(2)+'%'],['Day change',sgn(day),cls(day)],['Total gain/loss',sgn(val-cost),cls(val-cost)],['Open',q?usd(q.o):'—'],['Prev close',q?usd(q.pc):'—'],['Day high',q?usd(q.h):'—'],['Day low',q?usd(q.l):'—']];
-  openSheet(`<div class="sh-head"><small>${esc(CLASS[sym]||'')}</small><h4>${esc(sym)} · ${esc(nameOf(sym))}</h4><div class="p num">${usd(px)}</div><div class="num ${cls(dp)}" style="font-weight:600">${tri(dp)} ${sgn(q?q.c-q.pc:0)} (${pct(dp).slice(1)}) today</div></div>
+  openSheet(`<div class="sh-head"><small>${esc(CLASS[sym]||clsOf(sym))}</small><h4>${esc(sym)} · ${esc(nameOf(sym))}</h4><div class="p num">${usd(px)}</div><div class="num ${cls(dp)}" style="font-weight:600">${tri(dp)} ${sgn(q?q.c-q.pc:0)} (${pct(dp).slice(1)}) today</div></div>
   <div class="stats">${st.map(([k,v,c])=>`<div><span>${k}</span><b class="num ${c||''}">${v}</b></div>`).join('')}</div>
-  <div class="btnrow"><button class="btn" data-close>Done</button></div>`);
+  <div class="btnrow"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="btn primary" data-trade="buy" data-sym="${esc(sym)}">Buy</button><button class="btn" data-trade="sell" data-sym="${esc(sym)}">Sell</button></div><button class="btn" data-close>Done</button></div>`);
+}
+function notesSheet(){
+  openSheet(`<div class="sh-head"><h4>Manager's notes</h4><small>Northvale Private Wealth · Conservative growth mandate</small></div>`+(S.notes||[]).map(n=>`<div style="padding:12px 20px;border-top:1px solid var(--line)"><small style="color:var(--mute)">${esc(n.date||'')}</small><b style="display:block;margin:2px 0 6px">${esc(n.title||'')}</b><div style="font-size:15px;white-space:pre-line">${esc(n.body||'')}</div></div>`).join('')+`<div class="btnrow"><button class="btn" data-close>Done</button></div>`);
+}
+function tradeSheet(side,sym,acctId){
+  const accts=S.a.filter(a=>side==='buy'||a.h.some(h=>h.s===sym));
+  if(!accts.length){toast('You don\'t own '+sym);return}
+  acctId=acctId&&accts.some(a=>a.id===acctId)?acctId:accts[0].id;
+  openSheet(`<div class="sh-head"><h4>${side==='buy'?'Buy':'Sell'}${sym?' '+esc(sym):''}</h4><small>Market order · fills at the latest price</small></div>
+  <div class="sh-field"><label for="tA">Account</label><select id="tA" style="width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:16px">${accts.map(a=>`<option value="${a.id}" ${a.id===acctId?'selected':''}>${esc(a.name)} · ${usd(a.cash)} cash</option>`).join('')}</select></div>
+  ${sym?'':'<div class="sh-field"><label for="tS">Ticker</label><input id="tS" autocapitalize="characters" spellcheck="false" placeholder="e.g. VOO"></div>'}
+  <div class="sh-field"><label for="tU">${side==='buy'?'Amount (USD)':'Amount (USD) — leave blank to sell all'}</label><input id="tU" inputmode="decimal" placeholder="$0.00"><div class="down" id="tE" style="font-size:13px;min-height:18px;margin-top:6px"></div></div>
+  <div class="btnrow"><button class="btn primary" id="tGo">Review order</button><button class="btn" data-close>Cancel</button></div>`);
+  $('tGo').onclick=async()=>{
+    const s=(sym||$('tS').value).trim().toUpperCase(),a=$('tA').value,u=parseFloat(($('tU').value||'').replace(/[$,]/g,''));
+    if(!/^[A-Z.\-]{1,10}$/.test(s)){$('tE').textContent='Enter a valid ticker';return}
+    if(side==='buy'&&!(u>0)){$('tE').textContent='Enter an amount';return}
+    $('tGo').disabled=true;$('tGo').textContent='Getting quote…';
+    try{const q=await quote(s,S.key);if(!q)throw new Error('none');S.q[s]=q}catch(e){$('tE').textContent='No quote found for '+s;$('tGo').disabled=false;$('tGo').textContent='Review order';return}
+    const px=S.q[s].c,ac=S.a.find(x=>x.id===a),h=ac.h.find(x=>x.s===s);
+    const n=side==='buy'?Math.floor(Math.min(u,ac.cash)/px):(u>0?Math.min(h?h.n:0,Math.ceil(u/px)):(h?h.n:0));
+    if(n<1){$('tE').textContent=side==='buy'?'Not enough cash in this account':'Nothing to sell';$('tGo').disabled=false;$('tGo').textContent='Review order';return}
+    $('tGo').disabled=false;$('tGo').textContent=`Confirm: ${side} ${n.toLocaleString()} ${s} ≈ ${usd(n*px)}`;
+    $('tGo').onclick=()=>{exec(a,side,s,side==='buy'?{usd:n*px+0.001}:{usd:n*px-0.001},'you');save();closeSheet();render();toast('Order filled')};
+  };
 }
 
 function renderAct(){
   const acts=[...S.acts].sort((a,b)=>b.t-a.t);
-  $('actMain').innerHTML=`<h2>${new Date(S.opened).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</h2><div class="card">`+acts.map(x=>`<div class="row"><div class="l"><b>${esc(x.txt)}</b><span>${esc(x.acct)}</span></div><div class="r"><b class="num ${x.amt>0?'up':''}">${x.amt>0?'+':'−'}${usd(Math.abs(x.amt))}</b></div></div>`).join('')+'</div>';
+  $('actMain').innerHTML=`<h2>Recent activity</h2><div class="card">`+acts.map(x=>`<div class="row"><div class="l"><b>${esc(x.txt)}</b><span>${esc(x.acct)}${x.by==='manager'?' · Managed':x.by==='you'?' · Your trade':''} · ${new Date(x.t).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></div><div class="r"><b class="num ${x.amt>0?'up':''}">${x.amt>0?'+':'−'}${usd(Math.abs(x.amt))}</b></div></div>`).join('')+'</div>';
 }
 function renderProf(){
   $('profMain').innerHTML=`<div class="card"><div class="row"><div class="l"><b>${esc(S.name)}</b><span>Client since ${new Date(S.opened).getFullYear()}</span></div></div>
   <button class="row" id="pKey"><div class="l"><b>Market data key</b><span>Finnhub · ends in ${esc(S.key.slice(-4))}</span></div><span class="chev">›</span></button>
+  <button class="row" id="pReq"><div class="l"><b>Ask for passcode on open</b><span>${S.noPin?'Off — opens straight to your balance':'On'}</span></div><b>${S.noPin?'Off':'On'}</b></button>
   <button class="row" id="pPin"><div class="l"><b>Change passcode</b></div><span class="chev">›</span></button>
   <button class="row" id="pBack"><div class="l"><b>Back up portfolio</b><span>Copy your data to save it somewhere safe</span></div><span class="chev">›</span></button>
   <button class="row" id="pRestore"><div class="l"><b>Restore from backup</b></div><span class="chev">›</span></button></div>
   <h2>Danger zone</h2><div class="card"><button class="row" id="pReset"><div class="l"><b class="down">Close accounts and start over</b><span>Re-invests $5,000,000 at current prices</span></div></button></div>
   <p class="note">Northvale Private · simulation only · data stays on this device</p>`;
   $('pKey').onclick=()=>formSheet('Market data key','Finnhub API key','text',v=>{S.key=v;save();renderProf();toast('Key updated');refresh(true)});
+  $('pReq').onclick=()=>{S.noPin=!S.noPin;save();renderProf();toast(S.noPin?'Passcode off':'Passcode on')};
   $('pPin').onclick=()=>formSheet('Change passcode','New 4-digit passcode','pin',v=>{if(!/^\d{4}$/.test(v))return 'Must be 4 digits';S.pin=v;save();toast('Passcode changed')});
   $('pBack').onclick=()=>{const data=JSON.stringify({...S,key:undefined,pin:undefined});openSheet(`<div class="sh-head"><h4>Back up portfolio</h4><small>Copy this text and keep it in Notes. Your key and passcode are not included.</small></div><div class="sh-field"><input id="bk" readonly></div><div class="btnrow"><button class="btn primary" id="cp">Copy</button><button class="btn" data-close>Done</button></div>`);$('bk').value=data;$('cp').onclick=async()=>{try{await navigator.clipboard.writeText(data);toast('Copied')}catch(e){$('bk').select();toast('Select and copy the text')}}};
   $('pRestore').onclick=()=>formSheet('Restore from backup','Paste backup text','text',v=>{try{const o=JSON.parse(v);if(!o.a||!o.hist)throw 0;S={...o,key:S.key,pin:S.pin,name:S.name};save();render();toast('Portfolio restored')}catch(e){return 'That backup text is not valid'}});
@@ -416,6 +479,7 @@ function formSheet(title,label,type,fn){
 
 /* ---------- navigation ---------- */
 document.addEventListener('click',e=>{
+  const tr=e.target.closest('[data-trade]');if(tr){tradeSheet(tr.dataset.trade,tr.dataset.sym||'',tr.dataset.acct);return}
   const a=e.target.closest('[data-a]');if(a){curAcct=+a.dataset.a;renderAcct(curAcct);show('acct');return}
   const s=e.target.closest('[data-s]');if(s){holdingSheet(s.dataset.s);return}
   const t=e.target.closest('.tabs button');if(t){curAcct=null;show(t.dataset.t)}
@@ -425,13 +489,13 @@ $('back').onclick=()=>{curAcct=null;show('home')};
 document.addEventListener('visibilitychange',()=>{
   if(!S)return;
   if(document.hidden){hiddenAt=Date.now();return}
-  if(unlocked&&hiddenAt&&Date.now()-hiddenAt>5*60000)lock();
+  if(unlocked&&hiddenAt&&Date.now()-hiddenAt>5*60000&&!S.noPin)lock();
   else if(unlocked&&Date.now()-S.last>2*60000)refresh(true);
 });
 
-function go(){render();show('home');if(Date.now()-S.last>2*60000)refresh(true)}
+function go(){render();show('home');refresh(true)}
 buildPad();
-if(!S)show('setup');else lock();
+if(!S)show('setup');else if(S.noPin){unlocked=true;go()}else lock();
 }
 </script>
 </body>

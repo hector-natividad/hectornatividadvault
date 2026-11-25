@@ -1,1 +1,12 @@
-{"v":1,"orders":[],"notes":[]}
+{
+  "v": 1,
+  "updated": "2026-11-25",
+  "notes": [
+    {
+      "date": "Nov 25, 2026",
+      "title": "Welcome to Northvale — your accounts are fully invested",
+      "body": "Your $5,000,000 is invested across a Rollover IRA and an Individual Brokerage account in a conservative growth mix: about 69% stocks, mostly broad index funds, with bonds, Treasury bills, gold and real estate for stability.\n\nWe start during a choppy stretch. U.S. stocks have pulled back from their October highs, led by large technology names. That doesn't change the plan. We don't chase headlines; we review every Monday and only act when the mix drifts or something real changes.\n\nExpect most weeks to be quiet. That's by design."
+    }
+  ],
+  "orders": []
+}
